@@ -1,7 +1,18 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { z } from "zod";
 import { MemoryItem, MemoryScope, MemorySearchResult } from "./types";
+
+const MAX_MEMORY_CONTENT_CHARS = 8_000;
+
+const memoryItemSchema = z.object({
+  id: z.string().min(1),
+  scope: z.enum(["global", "team", "personal"]),
+  tags: z.array(z.string()).optional(),
+  createdAt: z.string().min(1),
+  content: z.string()
+});
 
 function scopeDir(memoryRoot: string, scope: MemoryScope): string {
   return path.join(memoryRoot, scope);
@@ -13,12 +24,19 @@ export async function addMemoryItem(
   content: string,
   tags: string[] = []
 ): Promise<MemoryItem> {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    throw new Error("Memory content must not be empty.");
+  }
+  if (trimmed.length > MAX_MEMORY_CONTENT_CHARS) {
+    throw new Error(`Memory content exceeds ${MAX_MEMORY_CONTENT_CHARS} characters.`);
+  }
   const item: MemoryItem = {
     id: crypto.randomUUID(),
     scope,
     createdAt: new Date().toISOString(),
     tags: tags.filter(Boolean),
-    content
+    content: trimmed
   };
   const filePath = path.join(scopeDir(memoryRoot, scope), `${item.id}.json`);
   await fs.writeFile(filePath, JSON.stringify(item, null, 2), "utf8");
@@ -33,8 +51,23 @@ export async function listMemoryByScope(memoryRoot: string, scope: MemoryScope):
     if (!file.endsWith(".json")) {
       continue;
     }
-    const raw = await fs.readFile(path.join(dir, file), "utf8");
-    items.push(JSON.parse(raw) as MemoryItem);
+    let raw: string;
+    try {
+      raw = await fs.readFile(path.join(dir, file), "utf8");
+    } catch {
+      continue;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const result = memoryItemSchema.safeParse(parsed);
+    if (!result.success || result.data.scope !== scope) {
+      continue;
+    }
+    items.push({ ...result.data, tags: result.data.tags ?? [] });
   }
   return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

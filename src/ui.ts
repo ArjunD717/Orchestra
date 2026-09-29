@@ -3071,8 +3071,12 @@ export class OrchestraTuiApp {
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const item = await addMemoryItem(this.deps.paths.memoryDir, scope, content, tags);
-    await this.showMessage("Memory saved", `Saved memory item ${item.id} in ${scope}.`);
+    try {
+      const item = await addMemoryItem(this.deps.paths.memoryDir, scope, content, tags);
+      await this.showMessage("Memory saved", `Saved memory item ${item.id} in ${scope}.`);
+    } catch (err) {
+      await this.showMessage("Memory error", err instanceof Error ? err.message : String(err));
+    }
   }
 
   private async searchMemoryFlow(): Promise<void> {

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { RepoSummary } from "./types";
-import { ensurePathWithinRoot } from "./security";
+import { ensurePathWithinRoot, redactSecrets } from "./security";
 
 const DEFAULT_IGNORES = new Set([
   ".git",
@@ -55,8 +55,13 @@ function isIgnored(relativePath: string, ignoreRules: IgnoreRules): boolean {
   return ignoreRules.suffixes.some((s) => relativePath.endsWith(s));
 }
 
+const SECRET_FILE_PATTERN = /(^|[/\\])\.env(\.|$)|(^|[/\\])\.npmrc$|\.pem$|\.key$/i;
+
 function isKeyFile(rel: string): boolean {
   const base = path.basename(rel).toLowerCase();
+  if (SECRET_FILE_PATTERN.test(rel) || SECRET_FILE_PATTERN.test(base)) {
+    return false;
+  }
   return (
     base === "package.json" ||
     base === "tsconfig.json" ||
@@ -108,7 +113,7 @@ export async function buildRepoSummary(
         if (isKeyFile(rel) && keyFiles.length < 12 && bytesRead < maxBytes) {
           const raw = await fs.readFile(full, "utf8").catch(() => "");
           const remaining = Math.max(0, maxBytes - bytesRead);
-          const snippet = raw.slice(0, Math.min(remaining, 800));
+          const snippet = String(redactSecrets(raw.slice(0, Math.min(remaining, 800))));
           bytesRead += Buffer.byteLength(snippet, "utf8");
           keyFiles.push({ path: rel, snippet });
         }

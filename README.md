@@ -14,7 +14,7 @@ It keeps workflow definitions, memory, run logs, and config on disk under your O
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22+ (developed and tested on Node 24)
 - npm
 
 Optional provider tooling depends on how you configure Orchestra. For example, the default workflow references the Codex subscription CLI by default.
@@ -23,6 +23,13 @@ Optional provider tooling depends on how you configure Orchestra. For example, t
 
 ```bash
 npm install
+```
+
+To use the `orchestra` command globally:
+
+```bash
+npm run build
+npm link
 ```
 
 ## Run
@@ -45,6 +52,12 @@ Run built app:
 npm start
 ```
 
+Or, after `npm link`:
+
+```bash
+orchestra
+```
+
 ## Storage
 
 By default Orchestra stores its data here:
@@ -56,18 +69,11 @@ By default Orchestra stores its data here:
 
 You can override the base directory with the `ORCHESTRA_HOME` environment variable.
 
-On this machine, that currently resolves to:
-
-- `C:\Users\box12\.orchestra\workflows`
-- `C:\Users\box12\.orchestra\memory`
-- `C:\Users\box12\.orchestra\runs`
-- `C:\Users\box12\.orchestra\config.json`
-
 ## Workflows
 
 Orchestra creates a default example workflow automatically the first time it initializes its home directory.
 
-The built-in template is defined in [src/paths.ts](C:\Dev\Orchestra\src\paths.ts) and written out to:
+The built-in template is defined in `src/paths.ts` and written out to:
 
 - `example.yaml` inside the workflows directory
 
@@ -80,6 +86,18 @@ The default workflow is:
 5. `review`
 
 The review step can restart the workflow with a planner handoff, and Orchestra can also accept a temporary review-generated follow-up workflow.
+
+### Ignoring files
+
+The repo summarizer respects a `.orchestraignore` file in the target repo root.
+One pattern per line, `#` comments allowed. Supported forms:
+
+- `path/to/file` — exact relative-path match
+- `*.log` — suffix match (anything after the `*` must end the path)
+
+There is no negation (`!keep.log`) and no directory-only (`dir/`) syntax:
+patterns are matched literally, not as globs. To exclude a directory,
+list the paths explicitly or use a `*dirname` suffix.
 
 ## Config
 
@@ -96,11 +114,16 @@ Current default provider config includes:
 
 ## Development Notes
 
-- Entry point: [src/index.ts](C:\Dev\Orchestra\src\index.ts)
-- TUI implementation: [src/ui.ts](C:\Dev\Orchestra\src\ui.ts)
-- Runner loop: [src/runner.ts](C:\Dev\Orchestra\src\runner.ts)
-- RLM context engine: [src/rlm-context.ts](C:\Dev\Orchestra\src\rlm-context.ts)
+- Entry point: `src/index.ts`
+- TUI implementation: `src/ui.ts`
+- Runner loop: `src/runner.ts`
+- RLM context engine: `src/rlm-context.ts`
 
 ## Status
 
 Orchestra is actively being iterated on in this repo, so UI behavior and workflow defaults may continue to change.
+
+## License
+
+No license file is present in this repo yet — all rights reserved by default.
+Do not redistribute or reuse this code until a `LICENSE` file is added.

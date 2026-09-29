@@ -11,7 +11,8 @@
     "dev": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "snake": "tsx src/index.ts snake"
+    "snake": "tsx src/index.ts snake",
+    "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "diff": "^5.2.0",

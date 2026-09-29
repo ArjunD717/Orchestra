@@ -55,5 +55,8 @@ export function sanitizePatchPath(input: string): string {
   }
   p = p.replace(/\\/g, "/");
   p = p.replace(/^\.\/+/, "");
+  if (p === "" || p === "." || p.split("/").some((segment) => segment === "..")) {
+    throw new Error(`Patch path escapes repo root: ${input}`);
+  }
   return p;
 }

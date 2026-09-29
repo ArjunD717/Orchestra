@@ -80,7 +80,11 @@ export function summarizeDiff(diffText: string): { files: string[]; additions: n
   const lines = diffText.split(/\r?\n/g);
   for (const line of lines) {
     if (line.startsWith("+++ ")) {
-      files.push(sanitizePatchPath(line.slice(4).trim()));
+      try {
+        files.push(sanitizePatchPath(line.slice(4).trim()));
+      } catch {
+        files.push(line.slice(4).trim());
+      }
     } else if (line.startsWith("+") && !line.startsWith("+++")) {
       additions += 1;
     } else if (line.startsWith("-") && !line.startsWith("---")) {
