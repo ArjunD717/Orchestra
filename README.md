@@ -125,5 +125,4 @@ Orchestra is actively being iterated on in this repo, so UI behavior and workflo
 
 ## License
 
-No license file is present in this repo yet — all rights reserved by default.
-Do not redistribute or reuse this code until a `LICENSE` file is added.
+MIT — see [LICENSE](LICENSE).
