@@ -2,7 +2,6 @@
   "name": "orchestra",
   "version": "0.1.0",
   "description": "Orchestra - local-first agentic coding TUI",
-  "license": "MIT",
   "main": "dist/index.js",
   "bin": {
     "orchestra": "dist/index.js"
