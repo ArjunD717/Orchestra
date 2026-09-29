@@ -1,3 +1,50 @@
+# Dependencies
 node_modules/
+*.tgz
+
+# Build output (tsc outDir)
 dist/
+build/
+*.tsbuildinfo
+
+# Local runtime data (ORCHESTRA_HOME defaults to ~/.orchestra;
+# a repo-local copy appears only when ORCHESTRA_HOME points here)
 .orchestra/
+# Mock-run artifact: emitted by the mock provider's sample diff, never source
+ORCHESTRA_NOTES.md
+
+# Env / secrets (config.json lives under ORCHESTRA_HOME, but never
+# commit accidental local env files or keys)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test / coverage artifacts
+coverage/
+.nyc_output/
+
+# Diff-apply leftovers (the runner applies unified diffs; failed
+# patches can leave these behind)
+*.orig
+*.rej
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
