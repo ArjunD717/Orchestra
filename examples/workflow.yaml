@@ -1,0 +1,81 @@
+schemaVersion: 1
+name: "Default Coding Workflow"
+description: "Plan -> logic -> ui -> debug -> review"
+steps:
+  - id: "plan"
+    role: "planner"
+    provider: "codex_subscription"
+    model: "gpt-5.2-codex"
+    systemPrompt: |
+      You are the planning step. Produce a concise, high-signal implementation plan.
+      Keep it actionable and aligned to repository context.
+    promptTemplate: |
+      You are Orchestra planner.
+      Build a short implementation plan for this task:
+      {{task}}
+    tools: ["filesystem"]
+    memory:
+      scopes: ["team", "personal"]
+      topK: 3
+  - id: "logic"
+    role: "engineer"
+    provider: "codex_subscription"
+    model: "gpt-5.3-codex"
+    systemPrompt: |
+      You are the logic implementation step. Work agentically across iterations.
+      Use repository context and prior iteration output to refine changes.
+      If you need more context, emit one or more ```orchestra_tool JSON blocks and include [CONTINUE].
+      Do not dump full source files or standalone code blocks.
+      For modifications, output ONLY a unified diff in a ```diff fenced block.
+      If the repo is empty, create a minimal runnable project scaffold via unified diff (new files are allowed).
+      If the step is complete, include [STEP_DONE]. If another pass is needed, include [CONTINUE].
+    promptTemplate: |
+      Implement a minimal runnable version of:
+      {{task}}
+
+      If the repo is empty, scaffold a browser-run project:
+      - index.html (loads Three.js via CDN and runs the game)
+      - main.js (game code)
+      - style.css (basic layout)
+      - README.md (how to run)
+
+      Return a unified diff that creates/updates these files.
+    tools: ["filesystem", "git"]
+    gate:
+      requireApprovalForDiff: true
+      requireApprovalForExternalCommands: true
+  - id: "ui"
+    role: "ui_engineer"
+    provider: "codex_subscription"
+    model: "gpt-5.3-codex"
+    systemPrompt: |
+      You are the UI refinement step. Focus on clarity, usability, and consistency.
+      Include [STEP_DONE] when done.
+    promptTemplate: |
+      Propose UI refinements for:
+      {{task}}
+    tools: ["filesystem"]
+  - id: "debug"
+    role: "debugger"
+    provider: "codex_subscription"
+    model: "gpt-5.2-codex"
+    systemPrompt: |
+      You are the debugging step. Find likely defects, edge cases, and fixes.
+      Include [STEP_DONE] when done.
+    promptTemplate: |
+      Identify likely bugs and suggest fixes for:
+      {{task}}
+    tools: ["filesystem", "tests"]
+    gate:
+      requireApprovalForExternalCommands: true
+  - id: "review"
+    role: "reviewer"
+    provider: "codex_subscription"
+    model: "gpt-5.2-codex"
+    systemPrompt: |
+      You are the final review step. Summarize what changed, risks, and next checks.
+      Include [STEP_DONE] when done.
+    promptTemplate: |
+      Review results and produce final summary for:
+      {{task}}
+    tools: ["filesystem"]

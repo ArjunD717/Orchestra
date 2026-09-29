@@ -1,0 +1,29 @@
+{
+  "name": "orchestra",
+  "version": "0.1.0",
+  "description": "Orchestra - local-first agentic coding TUI",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "bin": {
+    "orchestra": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "snake": "tsx src/index.ts snake"
+  },
+  "dependencies": {
+    "diff": "^5.2.0",
+    "neo-blessed": "^0.2.0",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.27",
+    "@types/diff": "^5.2.3",
+    "@types/node": "^22.10.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
