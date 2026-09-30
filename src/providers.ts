@@ -23,6 +23,18 @@ interface OpenAICompatibleOptions {
   enabled?: boolean;
 }
 
+const OUTPUT_CAP_CHARS = 1_000_000;
+const OUTPUT_TRUNCATED_SUFFIX = "\n[orchestra] output truncated at 1MB";
+function appendOutputCapped(current: string, chunk: string): string {
+  if (current.length >= OUTPUT_CAP_CHARS) {
+    return current;
+  }
+  if (current.length + chunk.length <= OUTPUT_CAP_CHARS) {
+    return current + chunk;
+  }
+  return current + chunk.slice(0, OUTPUT_CAP_CHARS - current.length);
+}
+
 interface SpawnResult {
   ok: boolean;
   code: number;
@@ -114,6 +126,12 @@ function stashProviderTrace(
   trace: ProviderTraceSnapshot
 ): void {
   providerTraceStore.set(providerTraceKey(request.runId, request.stepId), trace);
+  if (providerTraceStore.size > 50) {
+    const oldest = providerTraceStore.keys().next();
+    if (!oldest.done) {
+      providerTraceStore.delete(oldest.value);
+    }
+  }
 }
 
 export function consumeProviderTrace(runId: string, stepId: string): ProviderTraceSnapshot {
@@ -358,12 +376,18 @@ async function runProcessWithOptions(
     }
 
     child.stdout?.on("data", (d) => {
-      stdout += String(d);
+      stdout = appendOutputCapped(stdout, String(d));
     });
     child.stderr?.on("data", (d) => {
-      stderr += String(d);
+      stderr = appendOutputCapped(stderr, String(d));
     });
     child.on("close", (code) => {
+      if (stdout.length >= OUTPUT_CAP_CHARS) {
+        stdout += OUTPUT_TRUNCATED_SUFFIX;
+      }
+      if (stderr.length >= OUTPUT_CAP_CHARS) {
+        stderr += OUTPUT_TRUNCATED_SUFFIX;
+      }
       if (timedOut) {
         const timeoutLabel = timeoutMs ?? 0;
         finish({
@@ -468,12 +492,18 @@ async function runProcessViaShell(
       }, timeoutMs);
     }
     child.stdout?.on("data", (d) => {
-      stdout += String(d);
+      stdout = appendOutputCapped(stdout, String(d));
     });
     child.stderr?.on("data", (d) => {
-      stderr += String(d);
+      stderr = appendOutputCapped(stderr, String(d));
     });
     child.on("close", (code) => {
+      if (stdout.length >= OUTPUT_CAP_CHARS) {
+        stdout += OUTPUT_TRUNCATED_SUFFIX;
+      }
+      if (stderr.length >= OUTPUT_CAP_CHARS) {
+        stderr += OUTPUT_TRUNCATED_SUFFIX;
+      }
       if (timedOut) {
         const timeoutLabel = timeoutMs ?? 0;
         finish({

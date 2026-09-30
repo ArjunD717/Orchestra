@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { writeFileAtomic } from "./atomic-write";
 import { RunEvent, RunRecord, WorkflowDefinition } from "./types";
 
 export interface RunPaths {
@@ -25,7 +26,7 @@ export async function createRunPaths(runsRoot: string): Promise<RunPaths> {
   const artifactsDir = path.join(runDir, "artifacts");
   const metaFile = path.join(runDir, "meta.json");
   await fs.mkdir(artifactsDir, { recursive: true });
-  await fs.writeFile(runFile, "", "utf8");
+  await writeFileAtomic(runFile, "");
   return { runId, createdAt, runFile, runDir, artifactsDir, metaFile };
 }
 
@@ -33,7 +34,7 @@ export async function writeRunMeta(
   metaFile: string,
   meta: RunMeta
 ): Promise<void> {
-  await fs.writeFile(metaFile, JSON.stringify(meta, null, 2), "utf8");
+  await writeFileAtomic(metaFile, JSON.stringify(meta, null, 2));
 }
 
 export async function listRuns(runsRoot: string): Promise<string[]> {
@@ -44,11 +45,17 @@ export async function listRuns(runsRoot: string): Promise<string[]> {
 export async function readRunEvents(runsRoot: string, runId: string): Promise<RunEvent[]> {
   const file = path.join(runsRoot, `${runId}.jsonl`);
   const raw = await fs.readFile(file, "utf8");
-  return raw
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as RunEvent);
+  const lines = raw.split(/\r?\n/g).map((line) => line.trim()).filter(Boolean);
+  const windowed = lines.length > 10_000 ? lines.slice(lines.length - 10_000) : lines;
+  const events: RunEvent[] = [];
+  for (const line of windowed) {
+    try {
+      events.push(JSON.parse(line) as RunEvent);
+    } catch {
+      // Skip corrupt lines so replay survives partial writes.
+    }
+  }
+  return events;
 }
 
 export async function readRunMeta(

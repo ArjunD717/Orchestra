@@ -111,7 +111,14 @@ export async function buildRepoSummary(
           return;
         }
         if (isKeyFile(rel) && keyFiles.length < 12 && bytesRead < maxBytes) {
+          const st = await fs.stat(full).catch(() => null);
+          if (st && st.size > 20 * 1024) {
+            continue;
+          }
           const raw = await fs.readFile(full, "utf8").catch(() => "");
+          if (raw.includes("\0")) {
+            continue;
+          }
           const remaining = Math.max(0, maxBytes - bytesRead);
           const snippet = String(redactSecrets(raw.slice(0, Math.min(remaining, 800))));
           bytesRead += Buffer.byteLength(snippet, "utf8");

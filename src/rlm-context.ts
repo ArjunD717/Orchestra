@@ -140,7 +140,7 @@ export class RLMContextEngine {
       signature,
       cached,
       ok,
-      output
+      output: output.slice(0, 2000)
     });
     if (this.toolRecords.length > 120) {
       this.toolRecords.splice(0, this.toolRecords.length - 90);
@@ -182,7 +182,7 @@ export class RLMContextEngine {
     }
     return this.toolRecords
       .slice(-15)
-      .map((r) => `Tool ${r.signature} cached=${r.cached} ok=${r.ok}\n${r.output}`)
+      .map((r) => `Tool ${r.signature} cached=${r.cached} ok=${r.ok}\n${r.output.slice(0, 2000)}`)
       .join("\n\n");
   }
 

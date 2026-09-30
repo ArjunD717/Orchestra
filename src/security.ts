@@ -1,11 +1,19 @@
+import fs from "node:fs";
 import path from "node:path";
 
 const SECRET_KEY_PATTERN = /api[-_]?key|token|secret|password|authorization/i;
+const SECRET_INDICATOR_PATTERN =
+  /api[_-]?key|token|secret|password|authorization|sk-|AIza|ghp_|gho_|xox[bpas]-|AKIA|BEGIN/i;
 const SECRET_VALUE_PATTERNS = [
   /sk-[a-zA-Z0-9]{10,}/g,
   /AIza[0-9A-Za-z\-_]{20,}/g,
-  /(?<=api[_-]?key["']?\s*[:=]\s*["'])[^"']+/gi,
-  /(?<=token["']?\s*[:=]\s*["'])[^"']+/gi
+  /ghp_[A-Za-z0-9]{20,}/g,
+  /gho_[A-Za-z0-9]{20,}/g,
+  /xox[bpas]-[A-Za-z0-9-]{10,}/g,
+  /AKIA[0-9A-Z]{16}/g,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/g,
+  /(?<=api[_-]?key["']?\s*[:=]\s*["'])[^"']{1,200}/gi,
+  /(?<=token["']?\s*[:=]\s*["'])[^"']{1,200}/gi
 ];
 
 export function redactSecrets(value: unknown): unknown {
@@ -13,8 +21,12 @@ export function redactSecrets(value: unknown): unknown {
     return value;
   }
   if (typeof value === "string") {
+    if (!SECRET_INDICATOR_PATTERN.test(value)) {
+      return value;
+    }
     let out = value;
     for (const pattern of SECRET_VALUE_PATTERNS) {
+      pattern.lastIndex = 0;
       out = out.replace(pattern, "[REDACTED]");
     }
     return out;
@@ -42,7 +54,44 @@ export function ensurePathWithinRoot(repoRoot: string, targetPath: string): stri
   const relative = path.relative(normalizedRoot, resolvedTarget);
   const inside = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
   if (!inside) {
-    throw new Error(`Path is outside selected repo root: ${targetPath}`);
+    throw new Error(`Path is outside selected repo root: ${relative || targetPath}`);
+  }
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(normalizedRoot);
+  } catch {
+    realRoot = normalizedRoot;
+  }
+  let ancestor = resolvedTarget;
+  const remainder: string[] = [];
+  for (;;) {
+    try {
+      fs.lstatSync(ancestor);
+      break;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== "ENOENT") {
+        return resolvedTarget;
+      }
+      const parent = path.dirname(ancestor);
+      if (parent === ancestor) {
+        break;
+      }
+      remainder.unshift(path.basename(ancestor));
+      ancestor = parent;
+    }
+  }
+  let realTarget: string;
+  try {
+    realTarget = path.join(fs.realpathSync(ancestor), ...remainder);
+  } catch {
+    return resolvedTarget;
+  }
+  const realRelative = path.relative(realRoot, realTarget);
+  const realInside =
+    realRelative === "" || (!realRelative.startsWith("..") && !path.isAbsolute(realRelative));
+  if (!realInside) {
+    throw new Error(`Path is outside selected repo root: ${relative || targetPath}`);
   }
   return resolvedTarget;
 }

@@ -86,6 +86,11 @@ const BASE_STEP_SYSTEM_PROMPT = [
 
 const MAX_MODEL_TOOL_CALLS_PER_ITERATION = 5;
 
+const RUN_WALL_CLOCK_MS = (() => {
+  const parsed = Number.parseInt(process.env.ORCHESTRA_RUN_TIMEOUT_MS ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30 * 60 * 1000;
+})();
+
 interface ParsedToolRequest {
   tool: string;
   command?: string;
@@ -1081,7 +1086,13 @@ function resolveStepIterationBudget(step: WorkflowStep): {
     typeof step.iterations === "number" && Number.isFinite(step.iterations) && step.iterations > 0
       ? Math.floor(step.iterations)
       : null;
-  return { maxIterations: Number.MAX_SAFE_INTEGER, autoUnbounded: true, configuredIterations };
+  if (configuredIterations !== null) {
+    return { maxIterations: configuredIterations, autoUnbounded: false, configuredIterations };
+  }
+  if (process.env.ORCHESTRA_AUTO_UNBOUNDED === "1") {
+    return { maxIterations: Number.MAX_SAFE_INTEGER, autoUnbounded: true, configuredIterations };
+  }
+  return { maxIterations: 12, autoUnbounded: false, configuredIterations };
 }
 
 function recursiveLogicEnabled(): boolean {
@@ -1259,6 +1270,7 @@ export async function executeRun(request: RunRequest): Promise<RunResult> {
   let activeWorkflow = request.workflow;
 
   try {
+    const runStartedAt = Date.now();
     for (let workflowPass = 1; workflowPass <= maxWorkflowPasses; workflowPass += 1) {
       const completedStepOutputs: CompletedStepOutput[] = [];
       let restartWorkflow = false;
@@ -1277,12 +1289,7 @@ export async function executeRun(request: RunRequest): Promise<RunResult> {
       const { maxIterations, autoUnbounded, configuredIterations } = resolveStepIterationBudget(step);
       const stepLabel = autoUnbounded ? "unbounded (auto)" : `${maxIterations}`;
       request.ui.log(`Step: ${step.id} (up to ${stepLabel} iteration${maxIterations > 1 ? "s" : ""})`);
-      if (configuredIterations !== null) {
-        request.ui.log(
-          `[${step.id}] Iteration limits are disabled globally. Ignoring configured iterations=${configuredIterations}.`
-        );
-      }
-        await append(
+      await append(
           toEvent(runPaths.runId, step.id, "step_started", {
             role: step.role,
             maxIterations: autoUnbounded ? null : maxIterations,
@@ -1315,6 +1322,11 @@ export async function executeRun(request: RunRequest): Promise<RunResult> {
       const isReviewStep = step.id.trim().toLowerCase() === "review";
 
       for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+        if (Date.now() - runStartedAt > RUN_WALL_CLOCK_MS) {
+          stopReason = "run_timeout";
+          request.ui.log(`Run wall-clock budget exceeded (${RUN_WALL_CLOCK_MS}ms). Stopping.`);
+          break;
+        }
         if (await noteCancellation(step.id, "iteration_start")) {
           stopReason = "terminated_by_user";
           break;

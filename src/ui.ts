@@ -180,10 +180,12 @@ function formatWorkspaceToolRequestLine(request: Record<string, unknown>): strin
 }
 
 function readClipboardText(): string {
+  if (process.platform !== 'win32') return '';
   try {
     return execFileSync("powershell", ["-NoProfile", "-Command", "Get-Clipboard -Raw"], {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2000
     }).replace(/\r\n/g, "\n");
   } catch {
     return "";

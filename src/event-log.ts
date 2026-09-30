@@ -8,6 +8,10 @@ export class EventLogWriter {
   async append(event: RunEvent): Promise<void> {
     const safe = redactSecrets(event);
     const line = JSON.stringify(safe);
-    await fs.appendFile(this.filePath, `${line}\n`, "utf8");
+    try {
+      await fs.appendFile(this.filePath, `${line}\n`, "utf8");
+    } catch (err) {
+      console.error(`[orchestra] Failed to append event: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 }

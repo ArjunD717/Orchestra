@@ -50,24 +50,68 @@ function resolvePatchTarget(repoRoot: string, oldFile: string, newFile: string):
 export async function applyUnifiedDiff(repoRoot: string, diffText: string): Promise<string[]> {
   const patches = parsePatch(diffText);
   const changedFiles: string[] = [];
+  const resolved: Array<{ target: string; deleteFile: boolean; original: string; isNew: boolean }> = [];
 
+  // Phase 1: resolve all targets (traversal throws propagate) and read originals.
   for (const patch of patches) {
     const oldName = patch.oldFileName ?? "";
     const newName = patch.newFileName ?? "";
     const { target, deleteFile } = resolvePatchTarget(repoRoot, oldName, newName);
-    const original = await fs.readFile(target, "utf8").catch(() => "");
-    const next = applyPatch(original, patch, { fuzzFactor: 0 });
-    if (next === false) {
-      throw new Error(`Patch failed for ${target}`);
+    const rel = path.relative(repoRoot, target);
+    let original: string;
+    let isNew = false;
+    try {
+      original = await fs.readFile(target, "utf8");
+    } catch {
+      const isNewFile = oldName.trim() === "/dev/null" || oldName.trim() === "dev/null";
+      if (deleteFile || !isNewFile) {
+        throw new Error(`Patch target does not exist: ${rel}`);
+      }
+      original = "";
+      isNew = true;
     }
+    resolved.push({ target, deleteFile, original, isNew });
+  }
 
-    if (deleteFile) {
-      await fs.rm(target, { force: true });
-    } else {
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.writeFile(target, next, "utf8");
+  // Phase 2: apply in memory, then write; on ANY failure restore backups then rethrow.
+  const pending: Array<{ target: string; deleteFile: boolean; next: string }> = [];
+  try {
+    for (let idx = 0; idx < patches.length; idx += 1) {
+      const item = resolved[idx];
+      const rel = path.relative(repoRoot, item.target);
+      if (item.deleteFile) {
+        pending.push({ target: item.target, deleteFile: true, next: "" });
+        continue;
+      }
+      const applied = applyPatch(item.original, patches[idx], { fuzzFactor: 0 });
+      if (applied === false) {
+        throw new Error(`Patch failed for ${rel}`);
+      }
+      pending.push({ target: item.target, deleteFile: false, next: applied as string });
     }
-    changedFiles.push(path.relative(repoRoot, target));
+    for (const item of pending) {
+      if (item.deleteFile) {
+        await fs.rm(item.target, { force: true });
+      } else {
+        await fs.mkdir(path.dirname(item.target), { recursive: true });
+        await fs.writeFile(item.target, item.next, "utf8");
+      }
+      changedFiles.push(path.relative(repoRoot, item.target));
+    }
+  } catch (error) {
+    for (const item of resolved) {
+      try {
+        if (item.isNew) {
+          await fs.rm(item.target, { force: true });
+        } else {
+          await fs.mkdir(path.dirname(item.target), { recursive: true });
+          await fs.writeFile(item.target, item.original, "utf8");
+        }
+      } catch {
+        // Best-effort rollback; surface the original failure.
+      }
+    }
+    throw error;
   }
 
   return changedFiles;

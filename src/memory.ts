@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { z } from "zod";
+import { writeFileAtomic } from "./atomic-write";
 import { MemoryItem, MemoryScope, MemorySearchResult } from "./types";
 
 const MAX_MEMORY_CONTENT_CHARS = 8_000;
@@ -39,7 +40,7 @@ export async function addMemoryItem(
     content: trimmed
   };
   const filePath = path.join(scopeDir(memoryRoot, scope), `${item.id}.json`);
-  await fs.writeFile(filePath, JSON.stringify(item, null, 2), "utf8");
+  await writeFileAtomic(filePath, JSON.stringify(item, null, 2));
   return item;
 }
 

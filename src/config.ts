@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { writeFileAtomic } from "./atomic-write";
 import { DEFAULT_CONFIG } from "./paths";
 import { OrchestraConfig } from "./types";
 
@@ -54,7 +55,14 @@ export async function readConfig(configPath: string): Promise<OrchestraConfig> {
 }
 
 export async function writeConfig(configPath: string, config: OrchestraConfig): Promise<void> {
-  await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+  await writeFileAtomic(configPath, JSON.stringify(config, null, 2));
+  if (process.platform !== "win32") {
+    try {
+      await fs.chmod(configPath, 0o600);
+    } catch {
+      // Best effort: permissions hardening must not fail the write.
+    }
+  }
 }
 
 export function addRecentRepo(config: OrchestraConfig, repoPath: string): OrchestraConfig {
